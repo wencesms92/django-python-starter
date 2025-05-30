@@ -25,7 +25,11 @@ SECRET_KEY = 'django-insecure-yz&&9j19ebw$y)f#w42y$!54fk_p6pw@1zfe%82go!16=kzn5e
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'nova-pulse-4.resiz.es',
+]
 
 
 # Application definition
