@@ -1,0 +1,163 @@
+{
+  "steps": [
+    {
+      "name": "packages:apt:build",
+      "inputs": [
+        {
+          "image": "ghcr.io/railwayapp/railpack-builder:latest"
+        }
+      ],
+      "commands": [
+        {
+          "cmd": "sh -c 'apt-get update \u0026\u0026 apt-get install -y python3-dev'",
+          "customName": "install apt packages: python3-dev"
+        }
+      ],
+      "caches": [
+        "apt",
+        "apt-lists"
+      ]
+    },
+    {
+      "name": "packages:mise",
+      "inputs": [
+        {
+          "step": "packages:apt:build"
+        }
+      ],
+      "commands": [
+        {
+          "path": "/mise/shims"
+        },
+        {
+          "path": "/etc/mise/config.toml",
+          "name": "mise.toml",
+          "customName": "create mise config"
+        },
+        {
+          "cmd": "sh -c 'mise trust -a \u0026\u0026 mise install'",
+          "customName": "install mise packages: python"
+        }
+      ],
+      "assets": {
+        "mise.toml": "[tools]\n  [tools.python]\n    version = \"3.11.12\"\n"
+      },
+      "variables": {
+        "MISE_CACHE_DIR": "/mise/cache",
+        "MISE_CONFIG_DIR": "/mise",
+        "MISE_DATA_DIR": "/mise",
+        "MISE_INSTALLS_DIR": "/mise/installs",
+        "MISE_SHIMS_DIR": "/mise/shims"
+      }
+    },
+    {
+      "name": "install",
+      "inputs": [
+        {
+          "step": "packages:mise"
+        }
+      ],
+      "commands": [
+        {
+          "cmd": "python -m venv /app/.venv"
+        },
+        {
+          "path": "/app/.venv/bin"
+        },
+        {
+          "src": "requirements.txt",
+          "dest": "requirements.txt"
+        },
+        {
+          "cmd": "pip install -r requirements.txt"
+        }
+      ],
+      "variables": {
+        "PIP_CACHE_DIR": "/opt/pip-cache",
+        "PIP_DEFAULT_TIMEOUT": "100",
+        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONFAULTHANDLER": "1",
+        "PYTHONHASHSEED": "random",
+        "PYTHONUNBUFFERED": "1",
+        "VIRTUAL_ENV": "/app/.venv"
+      },
+      "caches": [
+        "pip"
+      ]
+    },
+    {
+      "name": "build",
+      "inputs": [
+        {
+          "step": "install"
+        }
+      ],
+      "commands": [
+        {
+          "src": ".",
+          "dest": "."
+        }
+      ],
+      "secrets": [
+        "*"
+      ]
+    }
+  ],
+  "caches": {
+    "apt": {
+      "directory": "/var/cache/apt",
+      "type": "locked"
+    },
+    "apt-lists": {
+      "directory": "/var/lib/apt/lists",
+      "type": "locked"
+    },
+    "pip": {
+      "directory": "/opt/pip-cache",
+      "type": "shared"
+    }
+  },
+  "deploy": {
+    "base": {
+      "image": "ghcr.io/railwayapp/railpack-runtime:latest"
+    },
+    "inputs": [
+      {
+        "step": "packages:mise",
+        "include": [
+          "/mise/shims",
+          "/mise/installs",
+          "/usr/local/bin/mise",
+          "/etc/mise/config.toml",
+          "/root/.local/state/mise"
+        ]
+      },
+      {
+        "step": "build",
+        "include": [
+          "/app/.venv"
+        ]
+      },
+      {
+        "step": "build",
+        "include": [
+          "."
+        ],
+        "exclude": [
+          ".venv"
+        ]
+      }
+    ],
+    "startCommand": "python manage.py migrate \u0026\u0026 gunicorn djangotutorial.wsgi:application",
+    "variables": {
+      "PIP_DEFAULT_TIMEOUT": "100",
+      "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+      "PORT": "4300",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PYTHONFAULTHANDLER": "1",
+      "PYTHONHASHSEED": "random",
+      "PYTHONUNBUFFERED": "1"
+    }
+  }
+}
